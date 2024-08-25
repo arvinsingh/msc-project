@@ -5,3 +5,7 @@ references/
 
 # data folder
 data/
+
+# comiled python files
+*.pyc
+__pycache__/
