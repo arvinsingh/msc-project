@@ -1,9 +1,9 @@
 import os
+import numpy as np
 import torchaudio
 import torch
 import torchaudio.transforms as T
 from torch.utils.data import Dataset
-import matplotlib.pyplot as plt
 
 class AudioFrameDataset(Dataset):
     """
@@ -15,10 +15,16 @@ class AudioFrameDataset(Dataset):
         self.max_frames = max_frames
         self.max_columns = max_columns
         self.transform = T.MFCC(sample_rate=16000, n_mfcc=13)
-
-        # Create a list of audio file paths
         self.file_list = []
-        for root, dirs, files in os.walk(root_directory):
+        self._walk_directory()
+
+    def _walk_directory(self):
+        """
+        Create a list of audio file paths
+        structure: root_directory/Fluent/XXX/X.wav
+        Structure: root_directory/Nonfluent/XXX/X.wav
+        """
+        for root, dirs, files in os.walk(self.root_directory):
             for file in files:
                 if file.endswith(".wav"):
                     self.file_list.append(os.path.join(root, file))
@@ -75,7 +81,7 @@ def get_dataloader(root_directory, label_to_index, max_frames=250, max_columns=4
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=MFCC_collate_fn)
     return dataloader
 
-def save_mfcc_features(dataloader, output_file):
+def save_mfcc_features(dataloader, output_dir):
     """
     save all the mfcc features to a pickle file.
     """
@@ -84,13 +90,15 @@ def save_mfcc_features(dataloader, output_file):
     for frames, label in dataloader:
         features.append(frames)
         labels.append(label)
-    features = torch.cat(features, dim=0)
-    labels = torch.cat(labels, dim=0)
-    torch.save((features, labels), output_file)
+    features = torch.cat(features, dim=0).numpy()
+    labels = torch.cat(labels, dim=0).numpy()
+    np.save(output_dir+"mfcc_features.npy", features)
+    np.save(output_dir+"mfcc_labels.npy", labels)
 
-def load_mfcc_features(input_file):
+def load_mfcc_features(input_dir):
     """
     Load the mfcc features from a pickle file.
     """
-    features, labels = torch.load(input_file)
+    features = np.load(os.path.join(input_dir, "mfcc_features.npy"))
+    labels = np.load(os.path.join(input_dir, "mfcc_labels.npy"))
     return features, labels
