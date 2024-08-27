@@ -4,7 +4,7 @@ references/
 
 
 # data folder
-data/
+/data/
 
 # comiled python files
 *.pyc
