@@ -1,9 +1,8 @@
 import torch
 from torch.utils.data import DataLoader
 from model import TripletLoss, SiameseModel, LSTM
-from src.data.dataset import MyDataset
 
-def train(target_dir, num_epochs=10, input_shape=(250, 400)):
+def train(train_dataset, num_epochs=10, input_shape=(250, 400)):
 
     
     lstm_network = LSTM(input_shape)
@@ -12,7 +11,6 @@ def train(target_dir, num_epochs=10, input_shape=(250, 400)):
     criterion = TripletLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    train_dataset = MyDataset(target_loc=target_dir, data_type="train")
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     
     for epoch in range(num_epochs):
