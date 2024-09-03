@@ -79,7 +79,7 @@ def create_landmarks_dataset(data_path, max_frames=150):
     dataset = []
     landmarks_dir = get_landmarks_dir(data_path)
     dataset = load_landmarks(landmarks_dir, max_frames)
-    dataset = pass
+    dataset = pad_sequences(dataset, max_frames)
     return dataset
 
 def save_landmarks(dataset, save_path):
