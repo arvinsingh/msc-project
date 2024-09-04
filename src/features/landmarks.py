@@ -1,32 +1,9 @@
 import os
 import numpy as np
-import torch
-from torch.utils.data import Dataset
 import py7zr
 import json
 
 
-class LandmarksDataset(Dataset):
-    def __init__(self, data, transform=None):
-        self.data = data
-        self.landmarks = landmarks
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        img_name = self.data.iloc[idx, 0]
-        image = Image.open(img_name)
-        landmarks = self.landmarks.iloc[idx, 1:].values.astype('float')
-        landmarks = landmarks.reshape(-1, 2)
-        sample = {'image': image, 'landmarks': landmarks}
-
-        if self.transform:
-            sample = self.transform(sample)
-
-        return sample
-    
 def get_landmarks_dir(data_path):
     '''
     Get the list of directories containing the landmarks data
@@ -46,7 +23,7 @@ def extract_mouth_contour_points(json_file):
     with open(json_file, 'r') as f:
         data = json.load(f)
         landmarks = data['landmarks']['points']
-        # points 48 to 67 correspond to the mouth contour
+        # points 48 to 68 correspond to the mouth contour
         mouth_contour_points = landmarks[48: 68]
     return mouth_contour_points
 
@@ -62,25 +39,22 @@ def get_mouth_sequences(landmarks_path, max_frames=150):
                 sequences[:, i, :, 0] = data.T
     return sequences
 
-
 def load_landmarks(dir_list, max_frames=150):
     landmarks = []
     for file in dir_list:
         landmarks.append(get_mouth_sequences(file, max_frames))
     return landmarks
 
-def pad_sequences(sequences, max_frames=150):
-    padded_sequences = np.zeros((len(sequences), 3, max_frames, 20, 1))
-    for i, sequence in enumerate(sequences):
-        padded_sequences[i, :, :sequence.shape[1], :, :] = sequence
-    return padded_sequences
-
 def create_landmarks_dataset(data_path, max_frames=150):
     dataset = []
     landmarks_dir = get_landmarks_dir(data_path)
     dataset = load_landmarks(landmarks_dir, max_frames)
-    dataset = pad_sequences(dataset, max_frames)
-    return dataset
+    final_dataset = np.stack(dataset, axis=-1)
+    final_dataset = np.transpose(final_dataset, (4, 0, 1, 2, 3))
+    return final_dataset
 
-def save_landmarks(dataset, save_path):
-    np.save(save_path, dataset)
+def save_dataset(dataset, save_path, filename):
+    np.save(save_path + filename, dataset)
+
+def load_dataset(data_path):
+    return np.load(data_path)
