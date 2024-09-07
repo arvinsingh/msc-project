@@ -1,6 +1,6 @@
 # src/features/__init__.py
 
-from .landmarks import create_landmarks_dataset, save_dataset, load_dataset
+from .landmarks import create_landmarks_dataset, save_landmark_dataset, load_landmark_dataset
 from .mfcc import create_mfcc_dataset, save_mfcc_dataset, load_mfcc_dataset
 from .triplets import create_triplets, save_triplets, load_triplets
 from .adjacency import Graph
