@@ -53,8 +53,8 @@ def create_landmarks_dataset(data_path, max_frames=150):
     final_dataset = np.transpose(final_dataset, (4, 0, 1, 2, 3))
     return final_dataset
 
-def save_dataset(dataset, save_path, filename):
+def save_landmark_dataset(dataset, save_path, filename):
     np.save(save_path + filename, dataset)
 
-def load_dataset(data_path):
+def load_landmark_dataset(data_path):
     return np.load(data_path)
