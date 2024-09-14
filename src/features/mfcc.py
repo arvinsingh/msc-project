@@ -5,59 +5,79 @@ import torch
 import torchaudio.transforms as T
 from torch.utils.data import Dataset
 
-class AudioFrameDataset(Dataset):
+def create_file_list(root_directory):
     """
-    A PyTorch Dataset that loads audio files and returns MFCC frames.
+    Create a list of audio file paths.
+    Structure: root_directory/Fluent/XXX/X.wav
+    Structure: root_directory/Nonfluent/XXX/X.wav
     """
-    def __init__(self, root_directory, label_to_index, max_frames=250, max_columns=400):
-        self.root_directory = root_directory
-        self.label_to_index = label_to_index
-        self.max_frames = max_frames
-        self.max_columns = max_columns
-        self.transform = T.MFCC(sample_rate=16000, n_mfcc=13)
-        self.file_list = []
-        self._walk_directory()
+    file_list = []
+    for root, dirs, files in os.walk(root_directory):
+        for file in files:
+            if file.endswith(".wav"):
+                file_list.append(os.path.join(root, file))
+    return file_list
 
-    def _walk_directory(self):
-        """
-        Create a list of audio file paths
-        structure: root_directory/Fluent/XXX/X.wav
-        Structure: root_directory/Nonfluent/XXX/X.wav
-        """
-        for root, dirs, files in os.walk(self.root_directory):
-            for file in files:
-                if file.endswith(".wav"):
-                    self.file_list.append(os.path.join(root, file))
 
-    def __len__(self):
-        return len(self.file_list)
+def process_frames(frames, max_columns):
+    """
+    Process frames to ensure consistent number of columns (features).
+    """
+    if frames.shape[2] < max_columns:
+        padding = torch.zeros(1, frames.shape[1], max_columns - frames.shape[2])
+        frames = torch.cat((frames, padding), dim=2)
+    elif frames.shape[2] > max_columns:
+        frames = frames[:, :, :max_columns]
+    return frames
 
-    def __getitem__(self, idx):
-        audio_file = self.file_list[idx]
-        waveform, sample_rate = torchaudio.load(audio_file)
 
-        # Apply transform to ensure consistent frame size
-        frames = self.transform(waveform)
+def process_waveforms(frames, max_frames):
+    """
+    Process waveforms to ensure consistent length.
+    """
+    if frames.shape[1] < max_frames:
+        padding = torch.zeros(1, max_frames - frames.shape[1], frames.shape[2])
+        frames = torch.cat((frames, padding), dim=1)
+    elif frames.shape[1] > max_frames:
+        frames = frames[:, :max_frames, :]
+    return frames
 
-        # Ensure all frames have the same number of columns (features)
-        if frames.shape[2] < self.max_columns:
-            padding = torch.zeros(1, frames.shape[1], self.max_columns - frames.shape[2])
-            frames = torch.cat((frames, padding), dim=2)
-        elif frames.shape[2] > self.max_columns:
-            frames = frames[:, :, :self.max_columns]
 
-        # Ensure all waveforms have the same length
-        if frames.shape[1] < self.max_frames:
-            padding = torch.zeros(1, self.max_frames - frames.shape[1], frames.shape[2])
-            frames = torch.cat((frames, padding), dim=1)
-        elif frames.shape[1] > self.max_frames:
-            frames = frames[:, :self.max_frames, :]
 
-        # Determine the label based on the higher-level directory structure
-        label = os.path.basename(os.path.dirname(os.path.dirname(audio_file)))  # Get the parent directory name
-        label_index = self.label_to_index[label]
+def process_audio_file(audio_file, max_frames=250, max_columns=400):
+    """
+    Process an audio file and return MFCC frames and label index.
+    """
+    waveform, sample_rate = torchaudio.load(audio_file)
 
-        return frames, label_index
+    # Apply transform to ensure consistent frame size
+    transform = T.MFCC(sample_rate=16000, n_mfcc=13)
+    frames = transform(waveform)
+
+    # Process frames
+    frames = process_frames(frames, max_columns)
+
+    # Process waveforms
+    frames = process_waveforms(frames, max_frames)
+
+    return frames
+
+
+def AudioFrameDataset(root_directory, max_frames=250, max_columns=400):
+    """
+    A function that loads audio files and returns MFCC frames.
+    """
+    file_list = create_file_list(root_directory)
+
+    def __len__():
+        return len(file_list)
+
+    def __getitem__(idx):
+        audio_file = file_list[idx]
+        frames = process_audio_file(audio_file, max_frames, max_columns)
+        return frames
+
+    return __len__, __getitem__
 
 
 def MFCC_collate_fn(batch):
@@ -73,11 +93,11 @@ def MFCC_collate_fn(batch):
 
     return frames, labels   
 
-def get_dataloader(root_directory, label_to_index, max_frames=250, max_columns=400, batch_size=32):
+def get_dataloader(root_directory, max_frames=250, max_columns=400, batch_size=32):
     """
     Create a DataLoader for the AudioFrameDataset.
     """
-    dataset = AudioFrameDataset(root_directory, label_to_index, max_frames, max_columns)
+    dataset = AudioFrameDataset(root_directory, max_frames, max_columns)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=MFCC_collate_fn)
     return dataloader
 
