@@ -2,7 +2,7 @@ import os
 import numpy as np
 import py7zr
 import json
-
+import shutil
 
 def get_landmarks_dir(data_path):
     '''
@@ -27,16 +27,17 @@ def extract_mouth_contour_points(json_file):
         mouth_contour_points = landmarks[48: 68]
     return mouth_contour_points
 
-def get_mouth_sequences(landmarks_path, max_frames=150):
+def get_mouth_sequences(landmarks_path, max_frames=250):
     sequences = np.zeros((3, max_frames, 20, 1))
     with py7zr.SevenZipFile(landmarks_path, mode='r') as archive:
-        archive.extractall()
+        archive.extractall('temp')
         for i, name in enumerate(archive.getnames()):
             if i >= max_frames:
                 break
             if name.endswith(".ljson"):
-                data = extract_mouth_contour_points(name)
-                sequences[:, i, :, 0] = data.T
+                data = extract_mouth_contour_points('temp\\' + name)
+                sequences[:, i, :, 0] = np.transpose(data)
+        shutil.rmtree('temp')
     return sequences
 
 def load_landmarks(dir_list, max_frames=150):
