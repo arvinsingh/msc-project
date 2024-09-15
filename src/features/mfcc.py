@@ -4,6 +4,7 @@ import torchaudio
 import torch
 import torchaudio.transforms as T
 from torch.utils.data import Dataset
+from torch.nn.functional import pad
 
 def create_file_list(root_directory):
     """
@@ -18,47 +19,47 @@ def create_file_list(root_directory):
                 file_list.append(os.path.join(root, file))
     return file_list
 
-
-def process_frames(frames, max_columns):
-    """
-    Process frames to ensure consistent number of columns (features).
-    """
-    if frames.shape[2] < max_columns:
-        padding = torch.zeros(1, frames.shape[1], max_columns - frames.shape[2])
-        frames = torch.cat((frames, padding), dim=2)
-    elif frames.shape[2] > max_columns:
-        frames = frames[:, :, :max_columns]
-    return frames
-
-
-def process_waveforms(frames, max_frames):
-    """
-    Process waveforms to ensure consistent length.
-    """
-    if frames.shape[1] < max_frames:
-        padding = torch.zeros(1, max_frames - frames.shape[1], frames.shape[2])
-        frames = torch.cat((frames, padding), dim=1)
-    elif frames.shape[1] > max_frames:
-        frames = frames[:, :max_frames, :]
-    return frames
+def truncate_or_pad_mfcc(mfcc, target_frames=250, target_columns=400):
+    # Get the current shape of the MFCC tensor
+    current_frames, current_columns = mfcc.shape[-2], mfcc.shape[-1]
+    
+    # Truncate or pad frames
+    if current_frames > target_frames:
+        mfcc = mfcc[..., :target_frames]
+    else:
+        pad_frames = target_frames - current_frames
+        mfcc = pad(mfcc, (0, 0, 0, pad_frames), mode='constant', value=0)
+    
+    # Truncate or pad columns
+    if current_columns > target_columns:
+        mfcc = mfcc[..., :target_columns]
+    else:
+        pad_columns = target_columns - current_columns
+        mfcc = pad(mfcc, (0, pad_columns, 0, 0), mode='constant', value=0)
+    
+    return mfcc
 
 
 
-def process_audio_file(audio_file, max_frames=250, max_columns=400):
+def process_audio_file(dir_path, target_sample_rate=16000, n_mfcc=13, max_frames=250, max_columns=400):
     """
     Process an audio file and return MFCC frames and label index.
+    :param dir_path: path to the audio files
+    :param target_sample_rate: target sample rate
+    :param n_mfcc: number of MFCC features - 12-13 for speech recognition tasks
+    :param max_frames: maximum number of frames
+    :param max_columns: maximum number of columns (features) per frame
+
+    :return: frames
     """
-    waveform, sample_rate = torchaudio.load(audio_file)
 
-    # Apply transform to ensure consistent frame size
-    transform = T.MFCC(sample_rate=16000, n_mfcc=13)
-    frames = transform(waveform)
-
-    # Process frames
-    frames = process_frames(frames, max_columns)
-
-    # Process waveforms
-    frames = process_waveforms(frames, max_frames)
+    waveform, original_sample_rate = torchaudio.load(dir_path)
+    # Apply transform to ensure consistent sample rate & frame size
+    resampler = T.Resample(orig_freq=original_sample_rate, new_freq=target_sample_rate)
+    mfcc_transform = T.MFCC(sample_rate=target_sample_rate, n_mfcc=n_mfcc)
+    waveform = resampler(waveform)
+    frames = mfcc_transform(waveform)
+    frames = truncate_or_pad_mfcc(frames, max_frames, max_columns)
 
     return frames
 
