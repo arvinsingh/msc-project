@@ -1,10 +1,12 @@
 import os
-import numpy as np
 import pandas as pd
-import torch
 
 from src.features import mfcc
 from src.features import landmarks
+
+import torch
+from torch.utils.data import Dataset
+
 
 import logging
 
@@ -16,15 +18,23 @@ logging.basicConfig(
 )
 
 
-class MyDataset():
+class MyDataset(Dataset):
 
 
-    def __init__(self, location):
+    def __init__(self, data=[], labels=[], location=""):
         self.location = location
         self.data_path = self.location + "dataset\\"
         self.general_labels = pd.read_csv(self.location + "labels.csv", index_col=0)
-        self.labels = list()
-        self.data = list()
+        self.data = data
+        self.labels = labels
+
+
+    def __len__(self):
+        return len(self.data)
+
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
 
 
     def create_dataset(self):
@@ -60,3 +70,43 @@ class MyDataset():
     def load_dataset(self, load_path):
         self.data = torch.load(load_path + "data.pt")
         self.labels = torch.load(load_path + "labels.pt")
+
+
+class AudioTripletDataset(Dataset):
+
+
+    def __init__(self, dataset, triplets):
+        self.dataset = dataset
+        self.triplets = triplets
+
+
+    def __len__(self):
+        return len(self.triplets)
+
+
+    def __getitem__(self, idx):
+        anchor_idx, positive_idx, negative_idx = self.triplets[idx]
+        anchor = self.dataset[anchor_idx][0]
+        positive = self.dataset[positive_idx][0]
+        negative = self.dataset[negative_idx][0]
+        return anchor, positive, negative
+
+
+class LandmarkTripletDataset(Dataset):
+
+
+    def __init__(self, dataset, triplets):
+        self.dataset = dataset
+        self.triplets = triplets
+
+
+    def __len__(self):
+        return len(self.triplets)
+
+
+    def __getitem__(self, idx):
+        anchor_idx, positive_idx, negative_idx = self.triplets[idx]
+        anchor = self.dataset[anchor_idx][1]
+        positive = self.dataset[positive_idx][1]
+        negative = self.dataset[negative_idx][1]
+        return anchor, positive, negative
