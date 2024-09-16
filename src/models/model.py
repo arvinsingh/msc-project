@@ -1,15 +1,15 @@
 import os
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
 import torch
 
 
 class LSTM(nn.Module):
+
     def __init__(self, input_shape, lstm_units=64):
         super(LSTM, self).__init__()
-
         self.lstm = nn.LSTM(input_size=input_shape[1], hidden_size=lstm_units, num_layers=1, batch_first=True)
+        self.attention = nn.Linear(lstm_units, 1)
         self.flatten = nn.Flatten()
         self.dense1 = nn.Linear(lstm_units, 128)
         self.dense2 = nn.Linear(128, 64)
@@ -17,15 +17,17 @@ class LSTM(nn.Module):
 
     def forward(self, x):
         x, _ = self.lstm(x)
+        attn_weights = F.softmax(self.attention(x), dim=1)
+        x = torch.sum(x * attn_weights, dim=1)
         x = self.flatten(x)
         x = F.relu(self.dense1(x))
         x = F.relu(self.dense2(x))
-        x = torch.sigmoid(self.dense3(x))
-
+        x = F.normalize(self.dense3(x), p=2, dim=1)
         return x
 
 
 class SiameseModel(torch.nn.Module):
+
     def __init__(self, siamese_network):
         super(SiameseModel, self).__init__()
         self.siamese_network = siamese_network
@@ -34,56 +36,28 @@ class SiameseModel(torch.nn.Module):
         embedding_anchor = self.siamese_network(anchor)
         embedding_positive = self.siamese_network(positive)
         embedding_negative = self.siamese_network(negative)
-        positive_similarity = euclidean_distance((embedding_anchor, embedding_positive))
-        negative_similarity = euclidean_distance((embedding_anchor, embedding_negative))
+        positive_similarity = euclidean_distance(embedding_anchor, embedding_positive)
+        negative_similarity = euclidean_distance(embedding_anchor, embedding_negative)
         return positive_similarity, negative_similarity
+
     
+def euclidean_distance(x1, x2):
+    """
+    Compute the Euclidean distance between two tensors.
+    Simplified version of the pairwise distance function.
+    """
+    return torch.sqrt(torch.sum((x1 - x2) ** 2, dim=1))
 
-class TripletLoss(torch.nn.Module):
-    def __init__(self, alpha=0.3):
-        super(TripletLoss, self).__init__()
-        self.alpha = alpha
 
-    def forward(self, anchor, positive, negative):
-        anchor_positive_distance = torch.sqrt(torch.sum(torch.square(anchor - positive), dim=-1))
-        anchor_negative_distance = torch.sqrt(torch.sum(torch.square(anchor - negative), dim=-1))
-        loss = torch.maximum(0.0, anchor_positive_distance - anchor_negative_distance + self.alpha)
-        return torch.mean(loss)
-    
-
-def euclidean_distance(vects):
+def euclidean_distance_original(vects):
+    """
+    Compute the Euclidean distance between two tensors.
+    Includes a small epsilon for numerical stability.
+    """
     x, y = vects
     sum_square = torch.sum(torch.square(x - y), dim=1, keepdim=True)
     return torch.sqrt(torch.maximum(sum_square, torch.tensor(1e-07)))
 
-def setup_log_directory(training_config):
-    """Tensorboard Log and Model checkpoint directory Setup"""
-
-    if os.path.isdir(training_config.root_log_dir):
-        # Get all folders numbers in the root_log_dir.
-        folder_numbers = [int(folder.replace("version_", "")) for folder in os.listdir(training_config.root_log_dir)]
-
-        # Find the latest version number present in the log_dir
-        last_version_number = max(folder_numbers)
-
-        # New version name
-        version_name = f"version_{last_version_number + 1}"
-
-    else:
-        version_name = training_config.log_dir
-
-    # Update the training config default directory.
-    training_config.log_dir = os.path.join(training_config.root_log_dir, version_name)
-    training_config.checkpoint_dir = os.path.join(training_config.root_checkpoint_dir, version_name)
-
-    # Create new directory for saving new experiment version.
-    os.makedirs(training_config.log_dir, exist_ok=True)
-    os.makedirs(training_config.checkpoint_dir, exist_ok=True)
-
-    print(f"Logging at: {training_config.log_dir}")
-    print(f"Model Checkpoint at: {training_config.checkpoint_dir}")
-
-    return training_config, version_name
 
 def save_model(model, device, model_dir="models", model_file_name="AV_classifier.pt"):
     if not os.path.exists(model_dir):
@@ -103,10 +77,20 @@ def save_model(model, device, model_dir="models", model_file_name="AV_classifier
 
     return
 
+
 def load_model(model, model_dir="models", model_file_name="AV_classifier.pt", device=torch.device("cpu")):
     model_path = os.path.join(model_dir, model_file_name)
 
     # Load model parameters by using 'load_state_dict'.
     model.load_state_dict(torch.load(model_path, map_location=device))
 
+    return model
+
+
+def MyModel(input_shape):
+    """
+    A wrapper function for Siamese LSTM.
+    """
+    model = LSTM(input_shape=input_shape)
+    model = SiameseModel(model)
     return model
