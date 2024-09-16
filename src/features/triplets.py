@@ -1,57 +1,46 @@
-import numpy as np
-import os
+import random
+import torch
 
 
-def generate_triplets(anchor_features, anchor_labels, num_triplets=1000):
-    triplets = []
-    labels = []
-    for _ in range(num_triplets):
-        # Randomly select anchor sample and its label
-        anchor_index = np.random.randint(0, len(anchor_features))
-        anchor_label = anchor_labels[anchor_index]
+class TripletGenerator:
+    def __init__(self, dataset=None, num_triplets=1000, load=False, root_path=None, prefix=""):
+        self.prefix = prefix
+        if load:
+            self.triplets = self._load_triplets(root_path)
+        else:
+            self.triplets = self._create_triplets(dataset, num_triplets)
+        
 
-        # Find positive samples - the same label as anchor
-        positive_indices = np.where(anchor_labels == anchor_label)[0]
-        positive_index = np.random.choice(positive_indices)
+    def _create_triplets(self, dataset, num_triplets=1000):
+        triplets = []
+        if isinstance(dataset, torch.utils.data.Subset):
+            indices = dataset.indices
+            labels = torch.tensor([dataset.dataset.labels[i] for i in indices])
+        else:
+            indices = list(range(len(dataset)))
+            labels = torch.tensor(dataset.labels)
 
-        # Find negative samples - different label from anchor
-        negative_indices = np.where(anchor_labels != anchor_label)[0]
-        negative_index = np.random.choice(negative_indices)
+        label_to_indices = {label.item(): (labels == label).nonzero(as_tuple=True)[0].tolist() for label in set(labels.numpy())}
+        for _ in range(num_triplets):
+            anchor_label = random.choice(list(label_to_indices.keys()))
+            anchor_idx = random.choice(label_to_indices[anchor_label])
+            positive_idx = random.choice(label_to_indices[anchor_label])
+            while positive_idx == anchor_idx:
+                positive_idx = random.choice(label_to_indices[anchor_label])
 
-        anchor = anchor_features[anchor_index]
-        positive = anchor_features[positive_index]
-        negative = anchor_features[negative_index]
+            negative_label = random.choice(list(label_to_indices.keys()))
+            while negative_label == anchor_label:
+                negative_label = random.choice(list(label_to_indices.keys()))
+            negative_idx = random.choice(label_to_indices[negative_label])
 
-        # Include anchor_label in triplet
-        triplet = (anchor, positive, negative)
-        label = anchor_label
+            triplets.append((anchor_idx, positive_idx, negative_idx))
 
-        triplets.append(triplet)
-        labels.append(label)
-
-    return np.array(triplets), np.array(labels)
+        return triplets
 
 
-def save_triplets(triplets, target_dir):
-    np.save(os.path.join(target_dir, 'train_triplets.npy'), triplets[0])
-    np.save(os.path.join(target_dir, 'train_labels.npy'), triplets[1])
+    def save_triplets(self, root_path):
+        torch.save(self.triplets, root_path + self.prefix + "triplets.pt")
 
-    np.save(os.path.join(target_dir, 'val_triplets.npy'), triplets[2])
-    np.save(os.path.join(target_dir, 'val_labels.npy'), triplets[3])
 
-    np.save(os.path.join(target_dir, 'test_triplets.npy'), triplets[4])
-    np.save(os.path.join(target_dir, 'test_labels.npy'), triplets[5])
-
-    print("Triplets and labels saved to:", target_dir)
-
-def load_triplets(target_dir):
-    train_triplets = np.load(os.path.join(target_dir, 'train_triplets.npy'))
-    train_labels = np.load(os.path.join(target_dir, 'train_labels.npy'))
-
-    val_triplets = np.load(os.path.join(target_dir, 'val_triplets.npy'))
-    val_labels = np.load(os.path.join(target_dir, 'val_labels.npy'))
-
-    test_triplets = np.load(os.path.join(target_dir, 'test_triplets.npy'))
-    test_labels = np.load(os.path.join(target_dir, 'test_labels.npy'))
-
-    return (train_triplets, train_labels, val_triplets, val_labels, test_triplets, test_labels)
+    def _load_triplets(self, root_path):
+        return torch.load(root_path + self.prefix + "triplets.pt")
