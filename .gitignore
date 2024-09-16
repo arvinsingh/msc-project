@@ -9,3 +9,6 @@ references/
 # comiled python files
 *.pyc
 __pycache__/
+
+# output folder
+/output/
