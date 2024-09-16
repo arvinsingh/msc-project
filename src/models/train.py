@@ -1,27 +1,73 @@
 import torch
-from torch.utils.data import DataLoader
-from model import TripletLoss, SiameseModel, LSTM
+import torch.nn as nn
+import torch.nn.functional as F
+from torchmetrics import MeanMetric
+from tqdm import tqdm
 
-def train(train_dataset, num_epochs=10, input_shape=(250, 400)):
+from src.config import TrainingConfig
+from .loss import triplet_loss
 
+
+def train(
+    train_config: TrainingConfig,
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    train_loader: torch.utils.data.DataLoader,
+    epoch_idx: int,
+    total_epochs: int,
+) -> tuple[float, float]:
     
-    lstm_network = LSTM(input_shape)
-    model = SiameseModel(lstm_network)
+    # Change model to training mode.
+    model.train()
 
-    criterion = TripletLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    mean_metric = MeanMetric()
+    correct = 0
+    total = 0
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    
-    for epoch in range(num_epochs):
-        model.train()
-        for data, labels in train_loader:
-            optimizer.zero_grad()
-            outputs = model(data)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+    device = train_config.device
 
-if __name__ == "__main__":
-    train()
+    status = f"Train:\tEpoch: {epoch_idx}/{total_epochs}"
+
+    prog_bar = tqdm(train_loader, bar_format="{l_bar}{bar:10}{r_bar}{bar:-10b}")
+    prog_bar.set_description(status)
+
+    for data in prog_bar:
+        # Send data to appropriate device.
+        anchor, positive, negative = data[0].to(device), data[1].to(device), data[2].to(device)
+
+        # Reset parameters gradient to zero.
+        optimizer.zero_grad()
+
+        # Forward pass to the model.
+        positive_similarity, negative_similarity = model(anchor, positive, negative)
+
+        # Triplet loss
+        loss = triplet_loss(positive_similarity, negative_similarity)
+
+        # Find gradients w.r.t training parameters.
+        loss.backward()
+
+        # Update parameters using gradients.
+        optimizer.step()
+
+        # Batch Loss.
+        mean_metric.update(loss.item(), weight=anchor.size(0))
+
+        # Apply threshold to determine correct predictions
+        threshold = train_config.threshold
+        pos_correct = (positive_similarity < threshold).sum().item()
+        neg_correct = (negative_similarity > threshold).sum().item()
+
+        correct += pos_correct + neg_correct
+        total += 2 * anchor.size(0)  # Two comparisons per triplet
+
+        # Update progress bar description.
+        step_status = status + f" Train Loss: {mean_metric.compute():.4f}, Train Acc: {correct / total:.4f}"
+        prog_bar.set_description(step_status)
+
+    epoch_loss = mean_metric.compute()
+    epoch_acc = correct / total
+
+    prog_bar.close()
+
+    return epoch_loss, epoch_acc
