@@ -24,6 +24,23 @@ class LSTM(nn.Module):
         x = F.relu(self.dense2(x))
         x = F.normalize(self.dense3(x), p=2, dim=1)
         return x
+    
+
+class STGCN(nn.Module):
+
+    def __init__(self, in_channels, out_channels, num_nodes, num_frames):
+        super(STGCN, self).__init__()
+        self.gcn = nn.Conv2d(in_channels, out_channels, kernel_size=(1, num_nodes))
+        self.tcn = nn.Conv2d(out_channels, out_channels, kernel_size=(num_frames, 1))
+
+    def forward(self, x):
+        # x shape: (batch_size, in_channels, num_frames, num_nodes)
+        x = self.gcn(x)
+        x = F.relu(x)
+        x = self.tcn(x)
+        x = F.relu(x)
+        x = x.view(x.size(0), -1)  # Flatten
+        return x
 
 
 class SiameseModel(torch.nn.Module):
@@ -40,6 +57,40 @@ class SiameseModel(torch.nn.Module):
         negative_similarity = euclidean_distance(embedding_anchor, embedding_negative)
         return positive_similarity, negative_similarity
 
+
+class CombinedSiameseNetwork(nn.Module):
+    def __init__(self, audio_network, landmarks_network):
+        super(CombinedSiameseNetwork, self).__init__()
+        self.audio_network = audio_network
+        self.landmarks_network = landmarks_network
+        self.fc = nn.Linear(64, 32)  # Combine embeddings
+
+    def forward(self, anchor_audio, anchor_landmarks, positive_audio, positive_landmarks, negative_audio, negative_landmarks):
+        # Process audio data
+        anchor_audio_embedding = self.audio_network(anchor_audio)
+        positive_audio_embedding = self.audio_network(positive_audio)
+        negative_audio_embedding = self.audio_network(negative_audio)
+
+        # Process landmarks data
+        anchor_landmarks_embedding = self.landmarks_network(anchor_landmarks)
+        positive_landmarks_embedding = self.landmarks_network(positive_landmarks)
+        negative_landmarks_embedding = self.landmarks_network(negative_landmarks)
+
+        # Combine embeddings
+        anchor_embedding = torch.cat((anchor_audio_embedding, anchor_landmarks_embedding), dim=1)
+        positive_embedding = torch.cat((positive_audio_embedding, positive_landmarks_embedding), dim=1)
+        negative_embedding = torch.cat((negative_audio_embedding, negative_landmarks_embedding), dim=1)
+
+        # Further process combined embeddings
+        anchor_embedding = F.relu(self.fc(anchor_embedding))
+        positive_embedding = F.relu(self.fc(positive_embedding))
+        negative_embedding = F.relu(self.fc(negative_embedding))
+
+        # Calculate similarities
+        positive_similarity = euclidean_distance(anchor_embedding, positive_embedding)
+        negative_similarity = euclidean_distance(anchor_embedding, negative_embedding)
+
+        return positive_similarity, negative_similarity
     
 def euclidean_distance(x1, x2):
     """
@@ -87,10 +138,27 @@ def load_model(model, model_dir="models", model_file_name="AV_classifier.pt", de
     return model
 
 
-def MyModel(input_shape):
+def audio_model(input_shape):
     """
     A wrapper function for Siamese LSTM.
     """
     model = LSTM(input_shape=input_shape)
     model = SiameseModel(model)
+    return model
+
+def landmark_model():
+    """
+    A wrapper function for Siamese LSTM.
+    """
+    model = STGCN(input_in_channels=3, out_channels=64, num_nodes=20, num_frames=250)
+    model = SiameseModel(model)
+    return model
+
+def combined_model(audio_input_shape):
+    """
+    A wrapper function for CombinedSiameseNetwork.
+    """
+    audio_network = LSTM(input_shape=audio_input_shape)
+    landmarks_network = STGCN(in_channels=3, out_channels=64, num_nodes=20, num_frames=250)
+    model = CombinedSiameseNetwork(audio_network, landmarks_network)
     return model
