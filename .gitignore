@@ -2,7 +2,6 @@
 # reference folder
 references/
 
-
 # data folder
 /data/
 
@@ -12,3 +11,6 @@ __pycache__/
 
 # output folder
 /output/
+
+# log files
+*.log
