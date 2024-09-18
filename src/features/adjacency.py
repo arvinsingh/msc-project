@@ -1,6 +1,8 @@
 
 import numpy as np
 
+import numpy as np
+
 class Graph():
     """
     Graph object that stores the adjacency matrix of the graph
@@ -18,7 +20,7 @@ class Graph():
     
     :return: Graph object
     """
-
+    
     def __init__(self, max_hop=1, dilation=1):
         self.max_hop = max_hop
         self.dilation = dilation
@@ -30,24 +32,20 @@ class Graph():
         """
         Edge connectivity based on ibug68 landmarks for lip region only
         0-11: lip contour, 12-19: inner lip
-        12-19: inner lip
         https://ibug.doc.ic.ac.uk/resources/300-W/
         """
-
-        edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8),
-                 (8, 9), (9, 10), (10, 11), (11, 0), (12, 13), (13, 14),
-                 (14, 15), (15, 16), (16, 17), (17, 18), (18, 19), (19, 12)]
-        self.num_node = len(edges)
-        self.edges = edges
+        self.num_node = 20  # Number of nodes
+        self.edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8),
+                      (8, 9), (9, 10), (10, 11), (11, 0), (12, 13), (13, 14),
+                      (14, 15), (15, 16), (16, 17), (17, 18), (18, 19), (19, 12)]
 
     def __str__(self):
         return str(self.A)
 
     def get_hop_distance(self):
         """
-        compute the hop distance between any two nodes
+        Compute the hop distance between any two nodes
         """
-
         num_node = self.num_node
         edges = self.edges
         max_hop = self.max_hop
@@ -66,9 +64,8 @@ class Graph():
 
     def get_adjacency(self):
         """
-        compute the adjacency matrix
+        Compute the adjacency matrix
         """
-
         valid_hop = range(0, self.max_hop + 1, self.dilation)
         adjacency = np.zeros((self.num_node, self.num_node))
         for hop in valid_hop:
@@ -79,11 +76,11 @@ class Graph():
         A[0] = normalize_adjacency
         self.A = A
 
+    @staticmethod
     def normalize_digraph(A):
         """
         Row-normalize the adjacency matrix
         """
-        
         Dl = np.sum(A, 0)
         num_node = A.shape[0]
         Dn = np.zeros((num_node, num_node))
