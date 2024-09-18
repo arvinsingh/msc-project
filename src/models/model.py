@@ -26,20 +26,33 @@ class LSTM(nn.Module):
         return x
     
 
+class GraphConvLayer(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(GraphConvLayer, self).__init__()
+        self.fc = nn.Linear(in_features, out_features)
+
+    def forward(self, x, adj):
+        x = torch.matmul(adj, x)
+        x = self.fc(x)
+        return x
+
 class STGCN(nn.Module):
-
-    def __init__(self, in_channels, out_channels, num_nodes, num_frames):
+    def __init__(self, num_nodes, in_channels, out_channels, num_frames, temporal_kernel_size=3):
         super(STGCN, self).__init__()
-        self.gcn = nn.Conv2d(in_channels, out_channels, kernel_size=(1, num_nodes))
-        self.tcn = nn.Conv2d(out_channels, out_channels, kernel_size=(num_frames, 1))
+        self.temporal_conv1 = nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=(temporal_kernel_size, 1))
+        self.graph_conv1 = GraphConvLayer(64, 32)
+        self.temporal_conv2 = nn.Conv2d(in_channels=32, out_channels=out_channels, kernel_size=(temporal_kernel_size, 1))
+        self.num_nodes = num_nodes # why?
+        self.num_frames = num_frames
 
-    def forward(self, x):
-        # x shape: (batch_size, in_channels, num_frames, num_nodes)
-        x = self.gcn(x)
+    def forward(self, x, adj):
+        x = self.temporal_conv1(x)
         x = F.relu(x)
-        x = self.tcn(x)
+        x = x.permute(0, 3, 1, 2)  # rearrange dimensions for graph convolution
+        x = self.graph_conv1(x, adj)
         x = F.relu(x)
-        x = x.view(x.size(0), -1)  # Flatten
+        x = x.permute(0, 2, 3, 1)  # rearrange dimensions back
+        x = self.temporal_conv2(x)
         return x
 
 
@@ -150,7 +163,7 @@ def landmark_model():
     """
     A wrapper function for Siamese LSTM.
     """
-    model = STGCN(input_in_channels=3, out_channels=64, num_nodes=20, num_frames=250)
+    model = STGCN(num_nodes=20, in_channels=3, out_channels=64, num_frames=250)
     model = SiameseModel(model)
     return model
 
@@ -159,6 +172,6 @@ def combined_model(audio_input_shape):
     A wrapper function for CombinedSiameseNetwork.
     """
     audio_network = LSTM(input_shape=audio_input_shape)
-    landmarks_network = STGCN(in_channels=3, out_channels=64, num_nodes=20, num_frames=250)
+    landmarks_network = STGCN(num_nodes=20, in_channels=3, out_channels=64, num_frames=250)
     model = CombinedSiameseNetwork(audio_network, landmarks_network)
     return model
