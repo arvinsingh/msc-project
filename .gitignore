@@ -16,4 +16,4 @@ __pycache__/
 *.log
 
 # report files
-/report/
+/reports/
