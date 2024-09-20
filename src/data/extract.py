@@ -8,6 +8,7 @@ def extract_landmarks(data_path='data\\raw\\dataset'):
     Extracts all 7z files from a directory and its subdirectories
     saves the extracted files in the same directory
     keep in separate folders where zip files are located
+    Args:
     :param data_path: path to the data directory
     '''
 
@@ -23,6 +24,7 @@ def extract_landmarks(data_path='data\\raw\\dataset'):
 def archive_landmarks(data_path='data\\raw\\dataset'):
     '''
     Archives all extracted files in a directory and its subdirectories
+    Args:
     :param data_path: path to the data directory
     '''
 
