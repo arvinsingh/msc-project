@@ -72,6 +72,26 @@ class MyDataset(Dataset):
         self.labels = torch.load(load_path + "labels.pt")
 
 
+class AudioLandmarkTripletDataset(Dataset):
+
+
+    def __init__(self, dataset, triplets):
+        self.dataset = dataset
+        self.triplets = triplets
+
+
+    def __len__(self):
+        return len(self.triplets)
+
+
+    def __getitem__(self, idx):
+        anchor_idx, positive_idx, negative_idx = self.triplets[idx]
+        anchor = self.dataset[anchor_idx]
+        positive = self.dataset[positive_idx]
+        negative = self.dataset[negative_idx]
+        return anchor, positive, negative
+
+
 class AudioTripletDataset(Dataset):
 
 
