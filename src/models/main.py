@@ -16,43 +16,43 @@ def main(model,
          scheduler=None, 
          system_config=SystemConfig(), 
          training_config=TrainingConfig(), 
-         data_augmentation=False
+         data_augmentation=False,
+         adj=None
          ):
     
-    # Setup system configuration.
+    # system config
     setup_system(system_config)
 
-    # Initialize data loader
+    # data loader
     train_loader, valid_loader = data_loader
 
-    # Number of epochs to train.
     NUM_EPOCHS = training_config.epochs_count
 
-    # Set acceleration device.
+    # acceleration device.
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    # Send model to device (GPU/CPU)
+    # send model to device (GPU/CPU)
     model.to(device)
 
-    # Initialize Adam optimizer.
+    # optimizer.
     optimizer = optim.Adam(model.parameters(), lr=training_config.init_learning_rate)
 
     best_loss = torch.tensor(np.inf)
 
-    # Epoch train & valid loss accumulator.
+    # epoch train & valid loss accumulator.
     epoch_train_loss = []
     epoch_valid_loss = []
 
-    # Epoch train & valid accuracy accumulator.
+    # epoch train & valid accuracy accumulator.
     epoch_train_acc = []
     epoch_valid_acc = []
 
-    # Trainig time measurement
+    # trainig time measurement
     t_begin = time.time()
 
     for epoch in range(NUM_EPOCHS):
-        train_loss, train_acc = train(training_config, model, optimizer, train_loader, epoch + 1, NUM_EPOCHS)
-        val_loss, val_accuracy = validate(training_config, model, valid_loader, epoch + 1, NUM_EPOCHS)
+        train_loss, train_acc = train(training_config, model, optimizer, train_loader, epoch + 1, NUM_EPOCHS, adj=adj)
+        val_loss, val_accuracy = validate(training_config, model, valid_loader, epoch + 1, NUM_EPOCHS, adj=adj)
 
         epoch_train_loss.append(train_loss)
         epoch_train_acc.append(train_acc)
