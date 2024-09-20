@@ -42,7 +42,7 @@ class STGCN(nn.Module):
         self.temporal_conv1 = nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=(temporal_kernel_size, 1))
         self.graph_conv1 = GraphConvLayer(64, 32)
         self.temporal_conv2 = nn.Conv2d(in_channels=32, out_channels=out_channels, kernel_size=(temporal_kernel_size, 1))
-        self.num_nodes = num_nodes # why?
+        self.num_nodes = num_nodes # why? Do I need this?
         self.num_frames = num_frames
 
     def forward(self, x, adj):
@@ -62,7 +62,7 @@ class SiameseModel(torch.nn.Module):
         super(SiameseModel, self).__init__()
         self.siamese_network = siamese_network
 
-    def forward(self, anchor, positive, negative):
+    def forward(self, anchor, positive, negative, adj=None):
         embedding_anchor = self.siamese_network(anchor)
         embedding_positive = self.siamese_network(positive)
         embedding_negative = self.siamese_network(negative)
@@ -78,28 +78,32 @@ class CombinedSiameseNetwork(nn.Module):
         self.landmarks_network = landmarks_network
         self.fc = nn.Linear(64, 32)  # Combine embeddings
 
-    def forward(self, anchor_audio, anchor_landmarks, positive_audio, positive_landmarks, negative_audio, negative_landmarks):
-        # Process audio data
+    def forward(self, anchor, positive, negative, adj):
+        anchor_audio, anchor_landmarks = anchor[0], anchor[1]
+        positive_audio, positive_landmarks = positive[0], positive[1]
+        negative_audio, negative_landmarks = negative[0], negative[1]
+
+        # process audio data
         anchor_audio_embedding = self.audio_network(anchor_audio)
         positive_audio_embedding = self.audio_network(positive_audio)
         negative_audio_embedding = self.audio_network(negative_audio)
 
-        # Process landmarks data
-        anchor_landmarks_embedding = self.landmarks_network(anchor_landmarks)
-        positive_landmarks_embedding = self.landmarks_network(positive_landmarks)
-        negative_landmarks_embedding = self.landmarks_network(negative_landmarks)
+        # process landmarks data
+        anchor_landmarks_embedding = self.landmarks_network(anchor_landmarks, adj)
+        positive_landmarks_embedding = self.landmarks_network(positive_landmarks, adj)
+        negative_landmarks_embedding = self.landmarks_network(negative_landmarks, adj)
 
-        # Combine embeddings
+        # combine embeddings
         anchor_embedding = torch.cat((anchor_audio_embedding, anchor_landmarks_embedding), dim=1)
         positive_embedding = torch.cat((positive_audio_embedding, positive_landmarks_embedding), dim=1)
         negative_embedding = torch.cat((negative_audio_embedding, negative_landmarks_embedding), dim=1)
 
-        # Further process combined embeddings
+        # further process combined embeddings
         anchor_embedding = F.relu(self.fc(anchor_embedding))
         positive_embedding = F.relu(self.fc(positive_embedding))
         negative_embedding = F.relu(self.fc(negative_embedding))
 
-        # Calculate similarities
+        # calculate similarities
         positive_similarity = euclidean_distance(anchor_embedding, positive_embedding)
         negative_similarity = euclidean_distance(anchor_embedding, negative_embedding)
 
@@ -129,7 +133,7 @@ def save_model(model, device, model_dir="models", model_file_name="AV_classifier
 
     model_path = os.path.join(model_dir, model_file_name)
 
-    # Make sure you transfer the model to cpu.
+    # transfer the model to cpu.
     if device == "cuda":
         model.to("cpu")
 
@@ -144,10 +148,7 @@ def save_model(model, device, model_dir="models", model_file_name="AV_classifier
 
 def load_model(model, model_dir="models", model_file_name="AV_classifier.pt", device=torch.device("cpu")):
     model_path = os.path.join(model_dir, model_file_name)
-
-    # Load model parameters by using 'load_state_dict'.
     model.load_state_dict(torch.load(model_path, map_location=device))
-
     return model
 
 
@@ -161,7 +162,7 @@ def audio_model(input_shape):
 
 def landmark_model():
     """
-    A wrapper function for Siamese LSTM.
+    A wrapper function for Siamese STGCN.
     """
     model = STGCN(num_nodes=20, in_channels=3, out_channels=64, num_frames=250)
     model = SiameseModel(model)
