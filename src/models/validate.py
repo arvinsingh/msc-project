@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torchmetrics import MeanMetric
 from tqdm import tqdm
 
@@ -13,10 +12,11 @@ def validate(
     model: nn.Module, 
     valid_loader: torch.utils.data.DataLoader,
     epoch_idx: int, 
-    total_epochs: int
+    total_epochs: int,
+    adj: torch.Tensor = None
 ) -> tuple[float, float]:
 
-    # Change model to evaluation mode.
+    # change model to evaluation mode.
     model.eval()
 
     mean_metric = MeanMetric()
@@ -31,21 +31,21 @@ def validate(
     prog_bar.set_description(status)
 
     for data in prog_bar:
-        # Send data to appropriate device.
+        # send data to appropriate device.
         anchor, positive, negative = data[0].to(device), data[1].to(device), data[2].to(device)
 
-        # Get the model's predicted logits.
+        # get the model's predicted similarities.
         with torch.no_grad():
-            positive_similarity, negative_similarity = model(anchor, positive, negative)
+            positive_similarity, negative_similarity = model(anchor, positive, negative, adj=adj)
 
 
         # Triplet loss
         loss = triplet_loss(positive_similarity, negative_similarity)
 
-        # Batch validation loss.
+        # batch validation loss.
         mean_metric.update(loss.item(), weight=anchor.size(0))
 
-        # Apply threshold to determine correct predictions
+        # Aapply threshold to determine correct predictions
         threshold = train_config.threshold
         pos_correct = (positive_similarity < threshold).sum().item()
         neg_correct = (negative_similarity > threshold).sum().item()
@@ -53,7 +53,7 @@ def validate(
         correct += pos_correct + neg_correct
         total += 2 * anchor.size(0)  # Two comparisons per triplet
 
-        # Update progress bar description.
+        # update progress bar description.
         step_status = status + f" Valid Loss: {mean_metric.compute():.4f}, Valid Acc: {correct / total:.4f}"
         prog_bar.set_description(step_status)
 
