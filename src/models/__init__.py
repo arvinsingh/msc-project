@@ -3,8 +3,8 @@
 from .train import train
 from .validate import validate
 from .test import test
-from .model import LSTM, STGCN, SiameseModel, CombinedSiameseNetwork, euclidean_distance, save_model, load_model, audio_model, landmark_model, combined_model
-from .loss import triplet_loss
+from .model import LSTM,LSTM_II,CNN, STGCN, SiameseModel, CombinedSiameseNetwork, euclidean_distance, save_model, load_model, audio_model, landmark_model, combined_model
+from .loss import TripletLoss, triplet_loss
 from .main import main
 
 __all__ = [
@@ -16,7 +16,10 @@ __all__ = [
     'validate', 
     'test', 
     'LSTM',
+    'LSTM_II',
+    'CNN',
     'STGCN',
+    'TripletLoss',
     'triplet_loss', 
     'SiameseModel', 
     'CombinedSiameseNetwork',
