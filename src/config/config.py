@@ -21,8 +21,9 @@ class TrainingConfig:
 
     num_classes: int = 2
     batch_size: int = 32
-    epochs_count: int = 10
-    init_learning_rate: float = 0.0001  # Initial learning rate
+    epochs_count: int = 20
+    init_learning_rate: float = 0.001  # Initial learning rate
+    weight_decay: float = 0.00001
     data_root: str = "..\\data\\processed\\"  # Root directory path of the dataset
     num_workers: int = 2
     device: str = "cuda"
@@ -35,7 +36,7 @@ class TrainingConfig:
     root_checkpoint_dir: str = os.path.join("..\\output\\Logs_Checkpoints", "Model_checkpoints")
 
     # Threshold for distance comparison
-    threshold: float = 0.5
+    threshold: float = 0.3
 
     # Current log and checkpoint directory.
     log_dir: str = "version_0"
