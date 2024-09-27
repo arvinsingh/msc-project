@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchmetrics import MeanMetric
 from tqdm import tqdm
 
@@ -13,7 +14,7 @@ def validate(
     valid_loader: torch.utils.data.DataLoader,
     epoch_idx: int, 
     total_epochs: int,
-    adj: torch.Tensor = None
+    criterion: nn.Module,
 ) -> tuple[float, float]:
 
     # change model to evaluation mode.
@@ -36,14 +37,20 @@ def validate(
 
         # get the model's predicted similarities.
         with torch.no_grad():
-            positive_similarity, negative_similarity = model(anchor, positive, negative, adj=adj)
+            anchor_output = model(anchor)
+            positive_output = model(positive)
+            negative_output = model(negative)
 
 
         # Triplet loss
-        loss = triplet_loss(positive_similarity, negative_similarity)
+        loss = criterion(anchor_output, positive_output, negative_output)
 
         # batch validation loss.
         mean_metric.update(loss.item(), weight=anchor.size(0))
+
+        # calculate similarities
+        positive_similarity = F.pairwise_distance(anchor_output, positive_output, p=2)
+        negative_similarity = F.pairwise_distance(anchor_output, negative_output, p=2)
 
         # Aapply threshold to determine correct predictions
         threshold = train_config.threshold

@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchmetrics import MeanMetric
 from tqdm import tqdm
 
 from src.config import TrainingConfig
-from .loss import triplet_loss
-
 
 def train(
     train_config: TrainingConfig,
@@ -14,7 +13,7 @@ def train(
     train_loader: torch.utils.data.DataLoader,
     epoch_idx: int,
     total_epochs: int,
-    adj: torch.Tensor = None
+    criterion: nn.Module,
 ) -> tuple[float, float]:
     
     # change model to training mode.
@@ -39,10 +38,12 @@ def train(
         optimizer.zero_grad()
 
         # forward pass to the model.
-        positive_similarity, negative_similarity = model(anchor, positive, negative, adj=adj)
+        anchor_output = model(anchor)
+        positive_output = model(positive)
+        negative_output = model(negative)
 
         # triplet loss
-        loss = triplet_loss(positive_similarity, negative_similarity)
+        loss = criterion(anchor_output, positive_output, negative_output)
 
         # find gradients w.r.t training parameters.
         loss.backward()
@@ -53,7 +54,11 @@ def train(
         # batch Loss.
         mean_metric.update(loss.item(), weight=anchor.size(0))
 
-        # Aapply threshold to determine correct predictions
+        # calculate similarities
+        positive_similarity = F.pairwise_distance(anchor_output, positive_output, p=2)
+        negative_similarity = F.pairwise_distance(anchor_output, negative_output, p=2)
+
+        # apply threshold to determine correct predictions
         threshold = train_config.threshold
         pos_correct = (positive_similarity < threshold).sum().item()
         neg_correct = (negative_similarity > threshold).sum().item()
