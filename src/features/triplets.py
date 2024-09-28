@@ -33,7 +33,7 @@ class TripletGenerator:
                 negative_label = random.choice(list(label_to_indices.keys()))
             negative_idx = random.choice(label_to_indices[negative_label])
 
-            triplets.append((anchor_idx, positive_idx, negative_idx))
+            triplets.append((anchor_idx, positive_idx, negative_idx, anchor_label))
 
         return triplets
 
