@@ -85,11 +85,11 @@ class AudioLandmarkTripletDataset(Dataset):
 
 
     def __getitem__(self, idx):
-        anchor_idx, positive_idx, negative_idx = self.triplets[idx]
+        anchor_idx, positive_idx, negative_idx, anchor_label = self.triplets[idx]
         anchor = self.dataset[anchor_idx]
         positive = self.dataset[positive_idx]
         negative = self.dataset[negative_idx]
-        return anchor, positive, negative
+        return anchor, positive, negative, anchor_label
 
 
 class AudioTripletDataset(Dataset):
@@ -105,11 +105,11 @@ class AudioTripletDataset(Dataset):
 
 
     def __getitem__(self, idx):
-        anchor_idx, positive_idx, negative_idx = self.triplets[idx]
+        anchor_idx, positive_idx, negative_idx, anchor_label = self.triplets[idx]
         anchor = self.dataset[anchor_idx][0]
         positive = self.dataset[positive_idx][0]
         negative = self.dataset[negative_idx][0]
-        return anchor, positive, negative
+        return anchor, positive, negative, anchor_label
 
 
 class LandmarkTripletDataset(Dataset):
@@ -125,8 +125,8 @@ class LandmarkTripletDataset(Dataset):
 
 
     def __getitem__(self, idx):
-        anchor_idx, positive_idx, negative_idx = self.triplets[idx]
+        anchor_idx, positive_idx, negative_idx, anchor_label = self.triplets[idx]
         anchor = self.dataset[anchor_idx][1]
         positive = self.dataset[positive_idx][1]
         negative = self.dataset[negative_idx][1]
-        return anchor, positive, negative
+        return anchor, positive, negative, anchor_label
