@@ -18,6 +18,7 @@ def main(model,
          system_config=SystemConfig(), 
          training_config=TrainingConfig(), 
          data_augmentation=False,
+         model_name="model.pt"
          ):
     
     # system config
@@ -72,7 +73,7 @@ def main(model,
             best_loss = val_loss
             print(f"\nModel Improved... Saving Model ... ", end="")
             try:
-                torch.save(model.state_dict(), os.path.join(training_config.checkpoint_dir, training_config.save_audio_model_name))
+                torch.save(model.state_dict(), os.path.join(training_config.checkpoint_dir, model_name))
                 print("Done.\n")
             except Exception as e:
                 print(f"Error saving model: {e}")
