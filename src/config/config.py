@@ -29,7 +29,7 @@ class TrainingConfig:
     device: str = "cuda"
 
     # For tensorboard logging and saving checkpoints
-    save_audio_model_name: str = "fluency_classifier.pt"
+    save_audio_model_name: str = "audio_classifier.pt"
     save_landmark_model_name: str = "landmark_classifier.pt"
     save_combined_model_name: str = "combined_classifier.pt"
     root_log_dir: str = os.path.join("..\\output\\Logs_Checkpoints", "Model_logs")
