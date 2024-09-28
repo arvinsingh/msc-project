@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch
 
 from src.features import Graph
+from src.config import TrainingConfig
 
 
 class LSTM(nn.Module):
@@ -53,6 +54,46 @@ class LSTM_II(nn.Module):
         x = F.relu(self.dense3(x))
         x = F.normalize(self.dense4(x), p=2, dim=1)
         return x
+
+
+class LSTM_III(nn.Module):
+    def __init__(self, input_shape, lstm_units=64):
+        super(LSTM_III, self).__init__()
+
+        # LSTM layer
+        self.lstm = nn.LSTM(input_size=input_shape[1], hidden_size=lstm_units, batch_first=True)
+
+        # batch norma layer after LSTM
+        self.batch_norm_lstm = nn.BatchNorm1d(input_shape[0])
+
+        # fully connected layers after flattening the LSTM output
+        self.flatten = nn.Flatten()
+        self.dense1 = nn.Linear(lstm_units * input_shape[0], 128)  # input_shape[0] = sequence length
+        self.batch_norm_dense1 = nn.BatchNorm1d(128)
+        self.dense2 = nn.Linear(128, 64)
+        self.batch_norm_dense2 = nn.BatchNorm1d(64)
+        self.dense3 = nn.Linear(64, 32)
+
+    def forward(self, x):
+        # LSTM layer
+        x, _ = self.lstm(x)
+        
+        # batchNorm after LSTM and activation (ReLU)
+        x = self.batch_norm_lstm(x)  # permute to apply BatchNorm over the right dimension
+        x = F.relu(x)  # permute back to original shape
+
+        # flatten
+        x = self.flatten(x)
+
+        # dense layers
+        x = F.relu(self.batch_norm_dense1(self.dense1(x)))
+        x = F.relu(self.batch_norm_dense2(self.dense2(x)))
+
+        # sigmoid activation for the last layer
+        x = torch.sigmoid(self.dense3(x))
+
+        return x
+
     
 
 class CNN(nn.Module):
@@ -95,7 +136,7 @@ class CNN(nn.Module):
     def forward(self, x):
         # add a channel dimension for CNN (batch_size, 1, 250, 400)
         x = x.unsqueeze(1)
-                x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn1(self.conv1(x)))
         x = self.pool1(x)
         
         x = F.relu(self.bn2(self.conv2(x)))
@@ -133,21 +174,40 @@ class STGCN(nn.Module):
             'dilation': 1
         }
         self.graph = Graph(**self.graph_args)
-        self.A = torch.tensor(self.graph.A, dtype=torch.float32)
+        self.A = torch.tensor(self.graph.A, dtype=torch.float32).to(TrainingConfig.device)
         self.temporal_conv1 = nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=(temporal_kernel_size, 1))
         self.graph_conv1 = GraphConvLayer(64, 32)
-        self.temporal_conv2 = nn.Conv2d(in_channels=32, out_channels=out_channels, kernel_size=(temporal_kernel_size, 1))
+        self.temporal_conv2 = nn.Conv2d(in_channels=32, out_channels=out_channels, kernel_size=(temporal_kernel_size, 1), padding=(1, 0))
         self.num_nodes = num_nodes # why? Do I need this?
         self.num_frames = num_frames
 
     def forward(self, x):
-        x = self.temporal_conv1(x)
+        # x is of shape [batch_size, num_frames, channel, num_nodes]
+        
+        # temporal convolution
+        x = self.temporal_conv1(x)  # output shape: [batch_size, 64, num_frames, num_nodes]
         x = F.relu(x)
-        x = x.permute(0, 3, 1, 2)  # rearrange dimensions for graph convolution
-        x = self.graph_conv1(x, self.A)
+
+        # permute x to [batch_size, num_nodes, num_frames, channels] for graph convolution
+        x = x.permute(0, 3, 2, 1)  # Shape: [batch_size, num_nodes, num_frames, 64]
+
+        # collapse the temporal dimension to prepare for graph convolution
+        batch_size, num_nodes, num_frames, num_channels = x.size()
+        x = x.view(batch_size * num_frames, num_nodes, num_channels)  # Shape: [batch_size*num_frames, num_nodes, 64]
+
+        # graph convolution
+        x = self.graph_conv1(x, self.A)  # operates on [num_nodes, features]
         x = F.relu(x)
-        x = x.permute(0, 2, 3, 1)  # rearrange dimensions back
+
+        # reshape back to [batch_size, num_nodes, num_frames, 32]
+        x = x.view(batch_size, num_frames, num_nodes, -1)
+
+        # permute x back to [batch_size, channels, num_frames, num_nodes]
+        x = x.permute(0, 3, 1, 2)
+
+        # second temporal convolution
         x = self.temporal_conv2(x)
+
         return x
     
 
