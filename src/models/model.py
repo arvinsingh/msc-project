@@ -90,7 +90,7 @@ class LSTM_III(nn.Module):
         x = F.relu(self.batch_norm_dense2(self.dense2(x)))
 
         # sigmoid activation for the last layer
-        x = torch.sigmoid(self.dense3(x))
+        x = F.normalize(self.dense3(x), p=2, dim=1)
 
         return x
 
