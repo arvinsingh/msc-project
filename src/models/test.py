@@ -4,6 +4,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
 from src.config import TrainingConfig
 
@@ -14,11 +15,15 @@ def test(
     test_loader: torch.utils.data.DataLoader,
     train_config: TrainingConfig,
 ):
-    audio_model.eval()
-    landmark_model.eval()
+    device = train_config.device
+    audio_model.to(device).eval()
+    landmark_model.to(device).eval()
     correct = 0
     total = 0
-    device = train_config.device
+
+    test_loader = DataLoader(test_loader, batch_size=TrainingConfig.batch_size, shuffle=True)
+
+    
 
     with torch.no_grad():
         for data in test_loader:
@@ -49,8 +54,8 @@ def test(
             correct += pos_correct + neg_correct
             total += 2 * anchor.size(0)
 
-    accuracy = correct / total
-    return accuracy
+    accuracy = (correct / total) * 100
+    print(f"Accuracy on test set: {accuracy:.2f}")
 
 
 
